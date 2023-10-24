@@ -140,26 +140,47 @@
         $_SESSION['user']['email'] = $_POST['email']; 
          
         // This redirects the user back to the members-only page after they register 
-        header("Location: private.php"); 
+        header("Location: index.php"); 
          
         // Calling die or exit after performing a redirect using the header function 
         // is critical.  The rest of your PHP script will continue to execute and 
         // will be sent to the user if you do not die or exit. 
-        die("Redirecting to private.php"); 
+        die("Redirecting to index.php"); 
     } 
      
 ?> 
-<h1>Edit Account</h1> 
-<form action="edit_account.php" method="post"> 
-    Username:<br /> 
-    <b><?php echo htmlentities($_SESSION['user']['username'], ENT_QUOTES, 'UTF-8'); ?></b> 
-    <br /><br /> 
-    E-Mail Address:<br /> 
-    <input type="text" name="email" value="<?php echo htmlentities($_SESSION['user']['email'], ENT_QUOTES, 'UTF-8'); ?>" /> 
-    <br /><br /> 
-    Password:<br /> 
-    <input type="password" name="password" value="" /><br /> 
-    <i>(leave blank if you do not want to change your password)</i> 
-    <br /><br /> 
-    <input type="submit" value="Update Account" /> 
-</form>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Editar Cuenta</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+</head>
+<body class="bg-dark"> <!-- Agregamos la clase "bg-dark" para establecer el fondo en negro -->
+    <div class="container mt-5">
+        <h1 class="text-white">Editar Cuenta</h1> <!-- Texto blanco -->
+        <form action="edit_account.php" method="post">
+            <div class="mb-3">
+                <label for="username" class="form-label text-white">Nombre de Usuario:</label>
+                <b class="form-control-static text-white"><?php echo htmlentities($_SESSION['user']['username'], ENT_QUOTES, 'UTF-8'); ?></b>
+            </div>
+            <div class="mb-3">
+                <label for="email" class="form-label text-white">Dirección de Correo Electrónico:</label>
+                <input type="text" class="form-control" id="email" name="email" value="<?php echo htmlentities($_SESSION['user']['email'], ENT_QUOTES, 'UTF-8'); ?>">
+            </div>
+            <div class="mb-3">
+                <label for="password" class="form-label text-white">Contraseña:</label>
+                <input type="password" class="form-control" id="password" name="password" value="">
+                <small class="form-text text-white">Deja en blanco si no deseas cambiar tu contraseña</small>
+            </div>
+            <div class="text-center">
+                <input type="submit" value="Actualizar Cuenta" class="btn btn-primary">
+            </div>
+        </form>
+    </div>
+</body>
+</html>
+
+
+

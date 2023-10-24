@@ -1,202 +1,202 @@
-<?php 
+<?php
+// Primero, ejecutamos nuestro código común para conectarnos a la base de datos y comenzar la sesión.
+require("common.php");
 
-    // First we execute our common code to connection to the database and start the session 
-    require("common.php"); 
-     
-    // This if statement checks to determine whether the registration form has been submitted 
-    // If it has, then the registration code is run, otherwise the form is displayed 
-    if(!empty($_POST)) 
-    { 
-        // Ensure that the user has entered a non-empty username 
-        if(empty($_POST['username'])) 
-        { 
-            // Note that die() is generally a terrible way of handling user errors 
-            // like this.  It is much better to display the error with the form 
-            // and allow the user to correct their mistake.  However, that is an 
-            // exercise for you to implement yourself. 
-            die("Please enter a username."); 
-        } 
-         
-        // Ensure that the user has entered a non-empty password 
-        if(empty($_POST['password'])) 
-        { 
-            die("Please enter a password."); 
-        } 
-         
-        // Make sure the user entered a valid E-Mail address 
-        // filter_var is a useful PHP function for validating form input, see: 
-        // http://us.php.net/manual/en/function.filter-var.php 
-        // http://us.php.net/manual/en/filter.filters.php 
-        if(!filter_var($_POST['email'], FILTER_VALIDATE_EMAIL)) 
-        { 
-            die("Invalid E-Mail Address"); 
-        } 
-         
-        // We will use this SQL query to see whether the username entered by the 
-        // user is already in use.  A SELECT query is used to retrieve data from the database. 
-        // :username is a special token, we will substitute a real value in its place when 
-        // we execute the query. 
-        $query = " 
-            SELECT 
-                1 
-            FROM users 
-            WHERE 
-                username = :username 
-        "; 
-         
-        // This contains the definitions for any special tokens that we place in 
-        // our SQL query.  In this case, we are defining a value for the token 
-        // :username.  It is possible to insert $_POST['username'] directly into 
-        // your $query string; however doing so is very insecure and opens your 
-        // code up to SQL injection exploits.  Using tokens prevents this. 
-        // For more information on SQL injections, see Wikipedia: 
-        // http://en.wikipedia.org/wiki/SQL_Injection 
-        $query_params = array( 
-            ':username' => $_POST['username'] 
-        ); 
-         
-        try 
-        { 
-            // These two statements run the query against your database table. 
-            $stmt = $db->prepare($query); 
-            $result = $stmt->execute($query_params); 
-        } 
-        catch(PDOException $ex) 
-        { 
-            // Note: On a production website, you should not output $ex->getMessage(). 
-            // It may provide an attacker with helpful information about your code.  
-            die("Failed to run query: " . $ex->getMessage()); 
-        } 
-         
-        // The fetch() method returns an array representing the "next" row from 
-        // the selected results, or false if there are no more rows to fetch. 
-        $row = $stmt->fetch(); 
-         
-        // If a row was returned, then we know a matching username was found in 
-        // the database already and we should not allow the user to continue. 
-        if($row) 
-        { 
-            die("This username is already in use"); 
-        } 
-         
-        // Now we perform the same type of check for the email address, in order 
-        // to ensure that it is unique. 
-        $query = " 
-            SELECT 
-                1 
-            FROM users 
-            WHERE 
-                email = :email 
-        "; 
-         
-        $query_params = array( 
-            ':email' => $_POST['email'] 
-        ); 
-         
-        try 
-        { 
-            $stmt = $db->prepare($query); 
-            $result = $stmt->execute($query_params); 
-        } 
-        catch(PDOException $ex) 
-        { 
-            die("Failed to run query: " . $ex->getMessage()); 
-        } 
-         
-        $row = $stmt->fetch(); 
-         
-        if($row) 
-        { 
-            die("This email address is already registered"); 
-        } 
-         
-        // An INSERT query is used to add new rows to a database table.
-        // Again, we are using special tokens (technically called parameters) to 
-        // protect against SQL injection attacks. 
-        $query = " 
-            INSERT INTO users ( 
-                username, 
-                password, 
-                salt, 
-                email 
-            ) VALUES ( 
-                :username, 
-                :password, 
-                :salt, 
-                :email 
-            ) 
-        "; 
-         
-        // A salt is randomly generated here to protect again brute force attacks 
-        // and rainbow table attacks.  The following statement generates a hex 
-        // representation of an 8 byte salt.  Representing this in hex provides 
-        // no additional security, but makes it easier for humans to read. 
-        // For more information: 
-        // http://en.wikipedia.org/wiki/Salt_%28cryptography%29 
-        // http://en.wikipedia.org/wiki/Brute-force_attack 
-        // http://en.wikipedia.org/wiki/Rainbow_table 
-        $salt = dechex(mt_rand(0, 2147483647)) . dechex(mt_rand(0, 2147483647)); 
-         
-        // This hashes the password with the salt so that it can be stored securely 
-        // in your database.  The output of this next statement is a 64 byte hex 
-        // string representing the 32 byte sha256 hash of the password.  The original 
-        // password cannot be recovered from the hash.  For more information: 
-        // http://en.wikipedia.org/wiki/Cryptographic_hash_function 
-        $password = hash('sha256', $_POST['password'] . $salt); 
-         
-        // Next we hash the hash value 65536 more times.  The purpose of this is to 
-        // protect against brute force attacks.  Now an attacker must compute the hash 65537 
-        // times for each guess they make against a password, whereas if the password 
-        // were hashed only once the attacker would have been able to make 65537 different  
-        // guesses in the same amount of time instead of only one. 
-        for($round = 0; $round < 65536; $round++) 
-        { 
-            $password = hash('sha256', $password . $salt); 
-        } 
-         
-        // Here we prepare our tokens for insertion into the SQL query.  We do not 
-        // store the original password; only the hashed version of it.  We do store 
-        // the salt (in its plaintext form; this is not a security risk). 
-        $query_params = array( 
-            ':username' => $_POST['username'], 
-            ':password' => $password, 
-            ':salt' => $salt, 
-            ':email' => $_POST['email'] 
-        ); 
-         
-        try 
-        { 
-            // Execute the query to create the user 
-            $stmt = $db->prepare($query); 
-            $result = $stmt->execute($query_params); 
-        } 
-        catch(PDOException $ex) 
-        { 
-            // Note: On a production website, you should not output $ex->getMessage(). 
-            // It may provide an attacker with helpful information about your code.  
-            die("Failed to run query: " . $ex->getMessage()); 
-        } 
-         
-        // This redirects the user back to the login page after they register 
-        header("Location: login.php"); 
-         
-        // Calling die or exit after performing a redirect using the header function 
-        // is critical.  The rest of your PHP script will continue to execute and 
-        // will be sent to the user if you do not die or exit. 
-        die("Redirecting to login.php"); 
-    } 
-     
-?> 
-<h1>Register</h1> 
-<form action="register.php" method="post"> 
-    Username:<br /> 
-    <input type="text" name="username" value="" /> 
-    <br /><br /> 
-    E-Mail:<br /> 
-    <input type="text" name="email" value="" /> 
-    <br /><br /> 
-    Password:<br /> 
-    <input type="password" name="password" value="" /> 
-    <br /><br /> 
-    <input type="submit" value="Register" /> 
-</form>
+// Esta declaración "if" verifica si el formulario de registro se ha enviado.
+// Si se ha enviado, se ejecuta el código de registro; de lo contrario, se muestra el formulario.
+if (!empty($_POST)) {
+    // Aseguramos que el usuario haya ingresado un nombre de usuario no vacío.
+    if (empty($_POST['username'])) {
+        // Ten en cuenta que die() generalmente no es la mejor manera de manejar errores de usuario como este.
+        // Es mucho mejor mostrar el error en el formulario y permitir al usuario corregir su error.
+        // Sin embargo, eso es un ejercicio para que lo implementes tú mismo.
+        die("Por favor, ingresa un nombre de usuario.");
+    }
+
+    // Aseguramos que el usuario haya ingresado una contraseña no vacía.
+    if (empty($_POST['password'])) {
+        die("Por favor, ingresa una contraseña.");
+    }
+
+    // Aseguramos que el usuario haya ingresado una dirección de correo electrónico válida.
+    // filter_var es una función útil en PHP para validar la entrada del formulario.
+    if (!filter_var($_POST['email'], FILTER_VALIDATE_EMAIL)) {
+        die("Dirección de correo electrónico no válida");
+    }
+
+    // Utilizaremos esta consulta SQL para comprobar si el nombre de usuario ingresado por el usuario ya está en uso.
+    // Una consulta SELECT se utiliza para recuperar datos de la base de datos.
+    // :username es un token especial; lo sustituiremos por un valor real cuando ejecutemos la consulta.
+    $query = "
+            SELECT
+                1
+            FROM users
+            WHERE
+                username = :username
+        ";
+
+    // Aquí se definen los valores para los tokens especiales en nuestra consulta SQL.
+    $query_params = array(
+        ':username' => $_POST['username']
+    );
+
+    try {
+        // Estas dos instrucciones ejecutan la consulta en la tabla de la base de datos.
+        $stmt = $db->prepare($query);
+        $result = $stmt->execute($query_params);
+    } catch (PDOException $ex) {
+        // Nota: En un sitio web de producción, no debes mostrar $ex->getMessage().
+        // Puede proporcionar información útil sobre tu código a un atacante.
+        die("Error al ejecutar la consulta: " . $ex->getMessage());
+    }
+
+    // El método fetch() devuelve una matriz que representa la "próxima" fila de los resultados seleccionados o false si no hay más filas para recuperar.
+    $row = $stmt->fetch();
+
+    // Si se devolvió una fila, sabemos que se encontró un nombre de usuario coincidente en la base de datos y no debemos permitir al usuario continuar.
+    if ($row) {
+        die("Este nombre de usuario ya está en uso");
+    }
+
+    // Ahora realizamos el mismo tipo de comprobación para la dirección de correo electrónico para asegurarnos de que sea única.
+    $query = "
+            SELECT
+                1
+            FROM users
+            WHERE
+                email = :email
+        ";
+
+    $query_params = array(
+        ':email' => $_POST['email']
+    );
+
+    try {
+        $stmt = $db->prepare($query);
+        $result = $stmt->execute($query_params);
+    } catch (PDOException $ex) {
+        die("Error al ejecutar la consulta: " . $ex->getMessage());
+    }
+
+    $row = $stmt->fetch();
+
+    if ($row) {
+        die("Esta dirección de correo electrónico ya está registrada");
+    }
+
+    $role = 'usuario';
+
+    // Una consulta INSERT se utiliza para agregar nuevas filas a una tabla de la base de datos.
+    // Nuevamente, usamos tokens especiales (parámetros) para protegernos contra ataques de inyección SQL.
+    $query = "
+            INSERT INTO users (
+                username,
+                password,
+                salt,
+                email,
+                rol
+            ) VALUES (
+                :username,
+                :password,
+                :salt,
+                :email,
+                :rol
+            )
+        ";
+
+    // Aquí generamos una sal de forma aleatoria para protegernos contra ataques de fuerza bruta y ataques de tabla arcoíris.
+    // La siguiente declaración genera una representación hexadecimal de una sal de 8 bytes.
+    $salt = dechex(mt_rand(0, 2147483647)) . dechex(mt_rand(0, 2147483647));
+
+    // Esto hashea la contraseña con la sal para que se almacene de manera segura en la base de datos.
+    // La salida de esta declaración es una cadena hexadecimal de 64 bytes que representa el hash sha256 de 32 bytes de la contraseña. La contraseña original no se puede recuperar del hash.
+    $password = hash('sha256', $_POST['password'] . $salt);
+
+    // A continuación, hasheamos el valor del hash 65536 veces más para protegernos contra ataques de fuerza bruta.
+    for ($round = 0; $round < 65536; $round++) {
+        $password = hash('sha256', $password . $salt);
+    }
+
+    if (empty($_POST['token']) || $_POST['token'] != 'Esto123') {
+        $rol = 'usuario';
+    } else {
+        $rol = 'admin';
+    }
+
+
+    // Aquí preparamos los tokens para su inserción en la consulta SQL.
+    // No almacenamos la contraseña original, solo su versión hasheada. Almacenamos la sal en forma de texto sin formato.
+    $query_params = array(
+        ':username' => $_POST['username'],
+        ':password' => $password,
+        ':salt' => $salt,
+        ':email' => $_POST['email'],
+        ':rol' => $rol
+    );
+
+    try {
+        // Ejecutamos la consulta para crear el usuario.
+        $stmt = $db->prepare($query);
+        $result = $stmt->execute($query_params);
+    } catch (PDOException $ex) {
+        // Nota: En un sitio web de producción, no debes mostrar $ex->getMessage().
+        // Puede proporcionar información útil sobre tu código a un atacante.
+        die("Error al ejecutar la consulta: " . $ex->getMessage());
+    }
+
+    // Esto redirige al usuario de nuevo a la página de inicio de sesión después de registrarse.
+    header("Location: index.php");
+
+    // Llamar a die o exit después de realizar una redirección utilizando la función header es crítico.
+    // El resto de tu script PHP continuará ejecutándose y se enviará al usuario si no mueres o sales.
+    die("Redirigiendo a index.php");
+}
+?>
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registro</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+</head>
+
+<body>
+    <div class="container mt-5">
+        <div class="row justify-content-center">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-body bg-dark">
+                        <h1 class="card-title text-center text-white">Registro</h1>
+                        <form action="register.php" method="post">
+                            <div class="mb-3">
+                                <label for="username" class="form-label text-white">Nombre de Usuario:</label>
+                                <input type="text" class="form-control" id="username" name="username" value="" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="email" class="form-label text-white">Correo Electrónico:</label>
+                                <input type="text" class="form-control" id="email" name="email" value="" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="password" class="form-label text-white">Contraseña:</label>
+                                <input type="password" class="form-control" id="password" name="password" value="" required>
+                            </div>
+                            <div class="mb-3">
+                                <label for="token" class="form-label text-white">Token:</label>
+                                <input type="password" class="form-control" id="token" name="token" value="" required>
+                            </div>
+                            <div class="text-center text-white">
+                                <input type="submit" value="Registrar" class="btn btn-primary">
+                            </div>
+                            <a href="login.php" class="text-white"> volver </a>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>

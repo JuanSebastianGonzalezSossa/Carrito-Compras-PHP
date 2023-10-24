@@ -25,5 +25,5 @@
     session_destroy();
 
     // Whether we destroy the session or not, we redirect them to the login page
-    header("Location: login.php");
-    die("Redirecting to: login.php");
+    header("Location: index.php");
+    die("Redirecting to: index.php");
